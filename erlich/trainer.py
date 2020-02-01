@@ -75,6 +75,7 @@ class BaseTrainer(abc.ABC):
 
     def setup(self, model, logger: TrainLogger, saver: ModelSaver):
         self.model = model
+        self.model = self.model.to(self.device)
         self.logger = logger
         self.saver = saver
 
@@ -123,9 +124,6 @@ class BaseTrainer(abc.ABC):
                 {len(self.dataloader) - 1})
 
         self.logger.min_wait = logger_min_wait
-
-        print("Moving model to", self.device)
-        self.model = self.model.to(self.device)
 
         use_apex = use_apex and HAS_APEX
         if use_apex:
