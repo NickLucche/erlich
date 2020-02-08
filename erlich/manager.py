@@ -127,6 +127,7 @@ class Erlich:
         # create model trainer
         trainer = trainer_class(cfg, model_parts, saver, logger, device)
         assert isinstance(trainer, BaseTrainer)
+        trainer.create_dataloaders()
 
         # instantiate optimizers
         print("Instantiating optimizers")

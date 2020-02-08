@@ -48,8 +48,8 @@ class BaseTrainer(abc.ABC):
         self.saver = saver
         self.logger = logger
 
-        self.dataloader = self.get_dataloader(self.batch_size)
-        self.validation_dataloader = self.get_validation_dataloader(self.validation_batch_size)
+        self.dataloader = None  # self.get_dataloader(self.batch_size)
+        self.validation_dataloader = None  # self.get_validation_dataloader(self.validation_batch_size)
 
         self.train_metrics = self.get_train_metrics()
         if not isinstance(self.train_metrics, list):
@@ -59,8 +59,9 @@ class BaseTrainer(abc.ABC):
         for metric in self.train_metrics:
             self.logger.add_meter(metric)
 
-    def set_parts(self, parts):
-        self.model_parts = parts
+    def create_dataloaders(self):
+        self.dataloader = self.get_dataloader(self.batch_size)
+        self.validation_dataloader = self.get_validation_dataloader(self.validation_batch_size)
 
     @staticmethod
     def standardize_kwargs(cfg, **kwargs):
