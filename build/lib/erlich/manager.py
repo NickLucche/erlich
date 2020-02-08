@@ -39,12 +39,11 @@ class Erlich:
         conf = OmegaConf.merge(conf, OmegaConf.from_dotlist(additional))
 
         # load requested configs, merge, then remove load list
-        if "load" in conf:
-            loads = []
-            for name in conf.get("load", []):
-                loads.append(OmegaConf.load(os.path.join(self.config_folder, name + ".yaml")))
-            conf = OmegaConf.merge(*loads, conf)
-            conf.pop("load")
+        loads = []
+        for name in conf.get("load", []):
+            loads.append(OmegaConf.load(os.path.join(self.config_folder, name + ".yaml")))
+        conf = OmegaConf.merge(*loads, conf)
+        conf.pop("load")
 
         # for each part load configuration if is requested
         for part_name in conf.parts:
