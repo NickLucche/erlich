@@ -1,0 +1,10 @@
+parts:
+  sino_denoiser:
+    arch: fast_unet
+    #jit: [batch_size, input_channels, img_size, img_size]
+
+input_channels: 2
+apex: O1
+load:
+  - common
+

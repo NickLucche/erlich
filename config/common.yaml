@@ -1,0 +1,5 @@
+img_size: 256
+n_angles: 256
+
+optimizer:
+  name: adam
