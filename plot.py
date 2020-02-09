@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import json
 import numpy as np
 
 
@@ -9,12 +10,12 @@ def moving_average(a, n=3):
 
 
 losses = []
-with open("log") as f:
+with open("0.log") as f:
     for line in f:
-        loss = float(line.split("    ")[2].strip().split(" ")[0])
+        loss = json.loads(line)["Loss"] #float(line.split("    ")[2].strip().split(" ")[0])
         losses.append(loss)
 
 losses = np.array(losses)
 plt.plot(losses)
-plt.plot(moving_average(losses, 100))
+plt.plot(moving_average(losses, 25))
 plt.show()

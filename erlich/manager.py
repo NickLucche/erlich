@@ -133,6 +133,23 @@ class Erlich:
         print("Instantiating optimizers")
         trainer.instantiate_optimizers(cfg)
 
+        # load checkpoint
+        # TODO move to trainer
+        if "load_checkpoint" in cfg:
+            if "@" in cfg["load_checkpoint"]:
+                load_id, load_batch = cfg["load_checkpoint"].split("@")
+            else:
+                load_id, load_batch = cfg["load_checkpoint"], "latest"
+
+            checkpoint = torch.load(os.path.join(self.model_folder, load_id, load_batch+".pth"), map_location=device)
+            for k in checkpoint["parts"]:
+                trainer.model_parts[k].load_state_dict(checkpoint["parts"][k])
+            for k in checkpoint["optimizers"]:
+                trainer.optimizers[k].load_state_dict(checkpoint["optimizers"][k])
+            # TODO amp loading should be done after initialization
+            # if "amp" in checkpoint and checkpoint["amp"] is not None:
+            #     amp.load_state_dict(checkpoint["amp"])
+
         # save config
         OmegaConf.save(cfg, cfg_path)
 
