@@ -136,10 +136,11 @@ class Erlich:
         # load checkpoint
         # TODO move to trainer
         if "load_checkpoint" in cfg:
-            if "@" in cfg["load_checkpoint"]:
-                load_id, load_batch = cfg["load_checkpoint"].split("@")
+            check_name = str(cfg["load_checkpoint"])
+            if "@" in check_name:
+                load_id, load_batch = check_name.split("@")
             else:
-                load_id, load_batch = cfg["load_checkpoint"], "latest"
+                load_id, load_batch = check_name, "latest"
 
             checkpoint = torch.load(os.path.join(self.model_folder, load_id, load_batch+".pth"), map_location=device)
             for k in checkpoint["parts"]:
