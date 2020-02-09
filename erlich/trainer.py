@@ -67,11 +67,14 @@ class BaseTrainer(abc.ABC):
     def standardize_kwargs(cfg, **kwargs):
         return {k: cfg[k] if k in cfg else kwargs[k] for k in kwargs}
 
-    def default_get_optimizer(self, name, optim_cfg, parameters, cfg):
+    def default_get_optimizer(self, name, optim_cfg, parameters, _):
         if name == "adam":
             cfg = self.standardize_kwargs(optim_cfg, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                                           weight_decay=0, amsgrad=False)
-            return torch.optim.Adam(parameters, **cfg)
+            print(cfg)
+            opt = torch.optim.Adam(parameters, **cfg)
+            print(opt.defaults)
+            return opt
         if name == "sgd":
             cfg = self.standardize_kwargs(optim_cfg, lr=1e-3, momentum=0, dampening=0,
                                           weight_decay=0, nesterov=False)
