@@ -71,9 +71,10 @@ class BaseTrainer(abc.ABC):
     def default_get_scheduler(self, name, optimizer, sched_cfg, _):
         if name == "step":
             cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
+            print("Scheduler cfg", cfg)
             return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
         else:
-            raise Exception(f"Unkown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
+            raise Exception(f"Unknown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
 
     def get_scheduler(self, name, optimizer, sched_cfg, cfg):
         return self.default_get_scheduler(name, optimizer, sched_cfg, cfg)
@@ -88,7 +89,7 @@ class BaseTrainer(abc.ABC):
                                           weight_decay=0, nesterov=False)
             return torch.optim.SGD(parameters, **cfg)
         else:
-            raise Exception(f"Unkown optimizer '{name}', please override 'get_optimizer' method to add this optimizer")
+            raise Exception(f"Unknown optimizer '{name}', please override 'get_optimizer' method to add this optimizer")
 
     def get_optimizer(self, name, optim_cfg, parameters, cfg):
         return self.default_get_optimizer(name, optim_cfg, parameters, cfg)
