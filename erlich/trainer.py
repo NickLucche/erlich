@@ -68,15 +68,15 @@ class BaseTrainer(abc.ABC):
     def standardize_kwargs(cfg, **kwargs):
         return {k: cfg[k] if k in cfg else kwargs[k] for k in kwargs}
 
-    def default_get_scheduler(self, name, sched_cfg, optimizer, _):
+    def default_get_scheduler(self, name, optimizer, sched_cfg, _):
         if name == "step":
             cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
             return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
         else:
             raise Exception(f"Unkown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
 
-    def get_scheduler(self, name, sched_cfg, optimizer, cfg):
-        return self.default_get_scheduler(name, sched_cfg, optimizer, cfg)
+    def get_scheduler(self, name, optimizer, sched_cfg, cfg):
+        return self.default_get_scheduler(name, optimizer, sched_cfg, cfg)
 
     def default_get_optimizer(self, name, optim_cfg, parameters, _):
         if name == "adam":

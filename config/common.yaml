@@ -3,3 +3,7 @@ n_angles: 256
 
 optimizer:
   name: adam
+  scheduler:
+    name: step
+    step_size: 2
+    gamma: 0.1
