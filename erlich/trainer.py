@@ -44,6 +44,7 @@ class BaseTrainer(abc.ABC):
         self.device = device
 
         self.optimizers = dict()
+        self.schedulers = dict()
         self.model_parts = model_parts
         self.saver = saver
         self.logger = logger
@@ -67,14 +68,21 @@ class BaseTrainer(abc.ABC):
     def standardize_kwargs(cfg, **kwargs):
         return {k: cfg[k] if k in cfg else kwargs[k] for k in kwargs}
 
+    def default_get_scheduler(self, name, sched_cfg, optimizer, _):
+        if name == "step":
+            cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
+            return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
+        else:
+            raise Exception(f"Unkown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
+
+    def get_scheduler(self, name, sched_cfg, optimizer, cfg):
+        return self.default_get_scheduler(name, sched_cfg, optimizer, cfg)
+
     def default_get_optimizer(self, name, optim_cfg, parameters, _):
         if name == "adam":
             cfg = self.standardize_kwargs(optim_cfg, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                                           weight_decay=0, amsgrad=False)
-            print(cfg)
-            opt = torch.optim.Adam(parameters, **cfg)
-            print(opt.defaults)
-            return opt
+            return torch.optim.Adam(parameters, **cfg)
         if name == "sgd":
             cfg = self.standardize_kwargs(optim_cfg, lr=1e-3, momentum=0, dampening=0,
                                           weight_decay=0, nesterov=False)
@@ -95,6 +103,9 @@ class BaseTrainer(abc.ABC):
                 if "optimizer" in part:
                     self.optimizers[part_name] = self.get_optimizer(part.optimizer.name, part.optimizer,
                                                                     self.model_parts[part_name].parameters(), cfg)
+                    if "scheduler" in part.optimizer:
+                        sched = part.optimizer.scheduler
+                        self.schedulers[part_name] = self.get_scheduler(sched.name, self.optimizers[part_name], sched, cfg)
                 else:
                     require_global_optimizer.append(part_name)
 
@@ -106,6 +117,10 @@ class BaseTrainer(abc.ABC):
 
             self.optimizers["__global"] = self.get_optimizer(cfg.optimizer.name, cfg.optimizer,
                                                              global_opt_parameters, cfg)
+
+            if "scheduler" in cfg.optimizer:
+                sched = cfg.optimizer.scheduler
+                self.schedulers["__global"] = self.get_scheduler(sched.name, self.optimizers["__global"], sched, cfg)
 
     @abc.abstractmethod
     def train_step(self, batch, batch_idx, train_metrics):
@@ -206,6 +221,10 @@ class BaseTrainer(abc.ABC):
 
             self.logger.epoch()
             self.validate(epoch, len(self.dataloader), using_apex)
+
+            for name in self.schedulers:
+                self.schedulers[name].step()
+                print(f"Learning Rate of {name} is {self.schedulers[name].get_lr()}")
 
 # class BaseTrainer(abc.ABC):
 #     def __init__(self, batch_size, validation_batch_size, epochs, optimizers_cfg, device):

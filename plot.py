@@ -17,5 +17,5 @@ with open("0.log") as f:
 
 losses = np.array(losses)
 plt.plot(losses)
-plt.plot(moving_average(losses, 25))
+plt.plot(moving_average(losses, 100))
 plt.show()
