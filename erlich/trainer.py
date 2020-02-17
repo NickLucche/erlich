@@ -68,10 +68,10 @@ class BaseTrainer(abc.ABC):
         return {k: cfg[k] if k in cfg else kwargs[k] for k in kwargs}
 
     def default_get_scheduler(self, name, optimizer, sched_cfg, _):
-        if name == "step":
-            cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
-            print("Scheduler cfg", cfg)
-            return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
+        # if name == "step":
+        #     cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
+        #     print("Scheduler cfg", cfg)
+        #     return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
         if name == "warmup_plateau":
             cfg = self.standardize_kwargs(sched_cfg, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3,
                                           patience=15)
@@ -220,6 +220,9 @@ class BaseTrainer(abc.ABC):
                 for optim in self.optimizers.values():
                     optim.step()
 
+                for name in self.schedulers:
+                    self.schedulers[name].step(loss.item())
+
                 self.logger.batch()
 
                 if batch_idx in validate_every:
@@ -228,9 +231,9 @@ class BaseTrainer(abc.ABC):
             self.logger.epoch()
             self.validate(epoch, len(self.dataloader), using_apex)
 
-            for name in self.schedulers:
-                self.schedulers[name].step()
-                print(f"Learning Rate of {name} is {self.schedulers[name].get_lr()}")
+            # for name in self.schedulers:
+            #     self.schedulers[name].step()
+            #     print(f"Learning Rate of {name} is {self.schedulers[name].get_lr()}")
 
 # class BaseTrainer(abc.ABC):
 #     def __init__(self, batch_size, validation_batch_size, epochs, optimizers_cfg, device):
