@@ -73,7 +73,7 @@ class BaseTrainer(abc.ABC):
         #     print("Scheduler cfg", cfg)
         #     return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
         if name == "warmup_plateau":
-            cfg = self.standardize_kwargs(sched_cfg, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3,
+            cfg = self.standardize_kwargs(sched_cfg, lr=0.1, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3,
                                           patience=15)
             print("Scheduler cfg", cfg)
             return WarmupPlateauScheduler(optimizer, **cfg)
