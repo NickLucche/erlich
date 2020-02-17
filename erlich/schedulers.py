@@ -51,7 +51,7 @@ class WarmupPlateauScheduler(LRScheduler):
 
         # first batches do LR warmup
         if step <= self.warmup_batches:
-            return self.initial_lr * (step / self.warmup_batches)
+            return self.initial_lr * (np.exp((step / self.warmup_batches)) - 1) / (np.exp(1) - 1)
         else:
             # if has enough loss values fit a line to see if the loss is decreasing
             if len(self.loss_values) == self.plateau_size:
