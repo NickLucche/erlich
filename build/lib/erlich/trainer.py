@@ -2,7 +2,8 @@ import torch
 from tqdm import tqdm
 import abc
 
-from .schedulers import WarmupPlateauScheduler
+from .logging import TrainLogger
+from .saver import ModelSaver
 
 try:
     from apex import amp
@@ -72,11 +73,6 @@ class BaseTrainer(abc.ABC):
             cfg = self.standardize_kwargs(sched_cfg, step_size=1, gamma=0.1)
             print("Scheduler cfg", cfg)
             return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
-        if name == "warmup_plateau":
-            cfg = self.standardize_kwargs(sched_cfg, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3,
-                                          patience=15)
-            print("Scheduler cfg", cfg)
-            return WarmupPlateauScheduler(optimizer, **cfg)
         else:
             raise Exception(f"Unknown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
 
@@ -110,8 +106,7 @@ class BaseTrainer(abc.ABC):
                                                                     self.model_parts[part_name].parameters(), cfg)
                     if "scheduler" in part.optimizer:
                         sched = part.optimizer.scheduler
-                        self.schedulers[part_name] = self.get_scheduler(sched.name, self.optimizers[part_name], sched,
-                                                                        cfg)
+                        self.schedulers[part_name] = self.get_scheduler(sched.name, self.optimizers[part_name], sched, cfg)
                 else:
                     require_global_optimizer.append(part_name)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='Erlich',
       version='0.1',
@@ -9,4 +9,5 @@ setup(name='Erlich',
       author_email='TODO',
       url='TODO',
       packages=['erlich'],
+      scripts=['cli/erlich.py']
      )
