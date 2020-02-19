@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 import abc
 
-from .schedulers import WarmupPlateauScheduler
+from .schedulers import WarmupScheduler, WarmupPlateauScheduler
 
 try:
     from apex import amp
@@ -77,6 +77,10 @@ class BaseTrainer(abc.ABC):
                                           patience=15)
             print("Scheduler cfg", cfg)
             return WarmupPlateauScheduler(optimizer, **cfg)
+        elif name == "warmup":
+            cfg = self.standardize_kwargs(sched_cfg, lr=0.1, warmup_batches=500)
+            print("Scheduler cfg", cfg)
+            return WarmupScheduler(optimizer, **cfg)
         else:
             raise Exception(f"Unknown scheduler '{name}', please override 'get_scheduler' method to add this scheduler")
 

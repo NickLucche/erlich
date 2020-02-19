@@ -17,14 +17,14 @@ with open("54.log") as f:
         xs.append(obj["time"])
         losses.append(loss)
 
-#losses = np.log(np.array(losses))
+losses = np.log(np.array(losses))
 x = np.array(xs)
 x -= np.min(x)
-x /= 60*60
+x /= 60
 train_time = x[-1] - x[0]
 print(f"Train time {train_time//60}h {int(train_time%60)}m")
-#plt.plot(x, losses)
-plt.plot(x[:-24], moving_average(losses, 25))
+plt.plot(losses)
+plt.plot(moving_average(losses, 25))
 plt.show()
 """
 a = []
