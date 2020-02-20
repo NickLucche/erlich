@@ -40,6 +40,23 @@ class WarmupScheduler(LRScheduler):
             return self.lr
 
 
+class WarmupStepScheduler(LRScheduler):
+    def __init__(self, optimizer, lr, warmup_batches=500, drop_every=100000, gamma=0.33):
+        self.initial_lr = lr
+        self.warmup_batches = warmup_batches
+        self.drop_every = drop_every
+        self.gamma = gamma
+
+        super().__init__(optimizer)
+
+    def compute_lr(self, step: int, loss_value: float):
+        # first batches do LR warmup
+        if step <= self.warmup_batches:
+            return self.initial_lr * (np.exp((step / self.warmup_batches)) - 1) / (np.exp(1) - 1)
+        else:
+            return self.initial_lr * (self.gamma ** (step // self.drop_every))
+
+
 class WarmupPlateauScheduler(LRScheduler):
     def __init__(self, optimizer, lr, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3, patience=15):
         self.initial_lr = lr

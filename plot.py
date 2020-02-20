@@ -10,7 +10,7 @@ def moving_average(a, n=3):
 
 losses = []
 xs = []
-with open("54.log") as f:
+with open("55.log") as f:
     for line in f:
         obj = json.loads(line)
         loss = obj["Loss"] #float(line.split("    ")[2].strip().split(" ")[0])
