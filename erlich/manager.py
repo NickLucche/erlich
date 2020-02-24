@@ -177,7 +177,7 @@ class Erlich:
         model_parts = self.instantiate_model_parts(cfg, device)
 
         # create model trainer
-        trainer = trainer_class(cfg, model_parts, saver, logger, device, rank)
+        trainer = trainer_class(cfg, model_parts, saver, logger, device, rank, world_size)
         assert isinstance(trainer, BaseTrainer)
         trainer.create_dataloaders()
 

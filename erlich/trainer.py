@@ -35,13 +35,14 @@ class AvgEstimator:
 
 
 class BaseTrainer(abc.ABC):
-    def __init__(self, cfg, model_parts, saver, logger, device, rank=0):
+    def __init__(self, cfg, model_parts, saver, logger, device, rank=0, world_size=1):
         self.cfg = cfg
         self.batch_size = cfg.batch_size
         self.validation_batch_size = cfg.validation_batch_size
         self.epochs = cfg.epochs
         self.device = device
         self.rank = rank
+        self.world_size = world_size
 
         self.optimizers = dict()
         self.schedulers = dict()
