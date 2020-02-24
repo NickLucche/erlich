@@ -3,10 +3,10 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import time
 
-from erlich import ModelManager, BaseTrainer, AverageEstimator
+from erlich import Erlich, BaseTrainer, AverageEstimator
 
 
-def create_model(architecture, params):
+def create_model_part(name, part_cfg, cfg):
     return nn.Sequential(
         nn.Linear(4, 1),
         nn.ReLU()
@@ -30,9 +30,12 @@ class ModelTrainer(BaseTrainer):
                           shuffle=True,
                           num_workers=4)
 
+    def pack_model(self):
+        return self.model_parts["sino_denoiser"]
+
     def train_step(self, batch, batch_idx, train_metrics):
         x, = batch
-        y = self.model(x)
+        y = self.model_parts["sino_denoiser"](x)
         loss = torch.mean(y)
 
         train_metrics[0].update(loss.item())
@@ -43,18 +46,10 @@ class ModelTrainer(BaseTrainer):
         return {"validation_loss": 1.0, "ssim": 99.0 + batch_idx}
 
 
-model_manager = ModelManager("models", create_model)
-
-architecture = "sample"
-arch_params = dict()
-
-batch_size = 16
-validation_batch_size = 32
-epochs = 10
-trainer = ModelTrainer(batch_size, validation_batch_size, epochs, "adam", torch.device("cuda"))
-
-model = model_manager.create_model(architecture, arch_params, trainer)
-trainer.train(validate_every=20000, logger_min_wait=0, use_apex=False)
+if __name__ == "__main__":
+    erlich = Erlich("config", "models", create_model_part)
+    cfg = erlich.config_from_cli()
+    erlich.train(ModelTrainer, cfg, devices=[0, 0])
 
 # import time
 # import pandas as pd

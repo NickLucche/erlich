@@ -7,12 +7,18 @@ import torch
 import torch.jit
 import torch.nn as nn
 from omegaconf import OmegaConf
+import torch.multiprocessing as mp
 
 from .saver import ModelSaver
 from .logging import TrainLogger
 from .trainer import BaseTrainer
 
 USAGE = """usage"""
+
+
+def run_train(rank, this, *args):
+    # print(rank, this, args)
+    this._train(rank, *args)
 
 
 class Erlich:
@@ -144,32 +150,30 @@ class Erlich:
         self.load_state_dicts(model_parts, checkpoint_path, device)
         return model_parts, cfg
 
-    def create_model(self, trainer_class, cfg, device) -> BaseTrainer:
-        print("=" * 20, "MODEL CONFIG", "=" * 20)
-        print(cfg.pretty())
-        print("=" * 20, "INSTANTIATING MODEL FOR TRAINING", "=" * 20)
+    def _train(self, rank, world_size, devices, trainer_class, cfg, mdl_id, mdl_path, validate_every, logger_min_wait):
+        device = devices[rank]
+        print(f"Spawned trainer process {rank} that will use GPU device {device}")
 
-        if not os.path.exists(self.model_folder):
-            os.mkdir(self.model_folder)
+        if rank == 0:
+            print("=" * 20, "INSTANTIATING MODEL FOR TRAINING", "=" * 20)
 
-        # get model ID and path
-        mdl_id = self.get_next_id()
-        mdl_path = os.path.join(self.model_folder, mdl_id)
-        cfg_path = f"{mdl_path}.yaml"
-
-        # instantiate logger and saver
-        logger = TrainLogger(mdl_path + ".log", cfg.epochs)
-        saver = ModelSaver(mdl_path)
+            # instantiate logger and saver
+            logger = TrainLogger(mdl_path + ".log", cfg.epochs)
+            saver = ModelSaver(mdl_path)
+        else:
+            logger = None
+            saver = None
 
         model_parts = self.instantiate_model_parts(cfg, device)
 
         # create model trainer
-        trainer = trainer_class(cfg, model_parts, saver, logger, device)
+        trainer = trainer_class(cfg, model_parts, saver, logger, device, rank)
         assert isinstance(trainer, BaseTrainer)
         trainer.create_dataloaders()
 
         # instantiate optimizers
-        print("Instantiating optimizers")
+        if rank == 0:
+            print("Instantiating optimizers")
         trainer.instantiate_optimizers(cfg)
 
         # load checkpoint
@@ -184,10 +188,60 @@ class Erlich:
             # if "amp" in checkpoint and checkpoint["amp"] is not None:
             #     amp.load_state_dict(checkpoint["amp"])
 
+        trainer.train(validate_every, logger_min_wait, distributed_data_parallel=world_size > 1)
+
+    def train(self, trainer_class, cfg, devices, validate_every=-1, logger_min_wait=5):
+        print("=" * 20, "MODEL CONFIG", "=" * 20)
+        print(cfg.pretty())
+
+        if not os.path.exists(self.model_folder):
+            os.mkdir(self.model_folder)
+
+        # get model ID and path
+        mdl_id = self.get_next_id()
+        mdl_path = os.path.join(self.model_folder, mdl_id)
+        cfg_path = f"{mdl_path}.yaml"
+
         # save config
         OmegaConf.save(cfg, cfg_path)
 
-        return trainer
+        world_size = len(devices)
+        mp.spawn(run_train,
+                 args=(self, world_size, devices, trainer_class, cfg, mdl_id, mdl_path, validate_every, logger_min_wait),
+                 nprocs=world_size,
+                 join=True)
+
+        #
+        # print("=" * 20, "INSTANTIATING MODEL FOR TRAINING", "=" * 20)
+        #
+        # # instantiate logger and saver
+        # logger = TrainLogger(mdl_path + ".log", cfg.epochs)
+        # saver = ModelSaver(mdl_path)
+        #
+        # model_parts = self.instantiate_model_parts(cfg, device)
+        #
+        # # create model trainer
+        # trainer = trainer_class(cfg, model_parts, saver, logger, device)
+        # assert isinstance(trainer, BaseTrainer)
+        # trainer.create_dataloaders()
+        #
+        # # instantiate optimizers
+        # print("Instantiating optimizers")
+        # trainer.instantiate_optimizers(cfg)
+        #
+        # # load checkpoint
+        # if "load_checkpoint" in cfg:
+        #     _, _, checkpoint_path = self.get_checkpoint(str(cfg["load_checkpoint"]))
+        #     checkpoint = self.load_state_dicts(trainer.model_parts, checkpoint_path, device)
+        #
+        #     if "load_optimizers" not in cfg or cfg["load_optimizers"]:
+        #         for k in checkpoint["optimizers"]:
+        #             trainer.optimizers[k].load_state_dict(checkpoint["optimizers"][k])
+        #     # TODO amp loading should be done after initialization
+        #     # if "amp" in checkpoint and checkpoint["amp"] is not None:
+        #     #     amp.load_state_dict(checkpoint["amp"])
+        #
+        # return trainer
         #
         # mdl_path = os.path.join(self.folder, str(mdl_id))
         # mdl = self.model_constructor(arch, params)
@@ -198,60 +252,3 @@ class Erlich:
         # trainer.setup(mdl, logger, saver)
         #
         # return mdl
-
-
-class ModelManager:
-    def __init__(self, folder, model_constructor=None):
-        self.folder = folder
-        self.model_constructor = model_constructor
-        self.models = [self._read(x) for x in glob(os.path.join(folder, "*.json"))]
-
-    @staticmethod
-    def _read(path):
-        with open(path) as f:
-            return json.load(f)
-
-    def create_model(self, arch, params, trainer: BaseTrainer, **kwargs) -> (nn.Module):
-        if self.model_constructor is None:
-            raise Exception(
-                "model_constructor is None\nPlease specify model_constructor function in ModelManager constructor")
-
-        mdl_id = self.get_next_id()
-        mdl_path = os.path.join(self.folder, str(mdl_id))
-        mdl = self.model_constructor(arch, params)
-        logger = TrainLogger(mdl_path + ".log", trainer.epochs)
-        saver = ModelSaver(self, mdl_id, arch, params, trainer.batch_size, trainer.optimizers_cfg, trainer.epochs,
-                           kwargs)
-
-        trainer.setup(mdl, logger, saver)
-
-        return mdl
-
-    def get_next_id(self):
-        self.models.append({})
-        return len(self.models) - 1
-
-    def save(self, obj, mid, mdl, current_epoch, validation_metrics, optimizers, amp):
-        cfg = {
-            "architecture": obj.arch,
-            "params": obj.params,
-            "batch_size": obj.batch_size,
-            "optimizer": obj.optimizer,
-            "tot_epochs": obj.tot_epochs,
-            "other": obj.other,
-            "curr_time": time.time(),
-            "current_epoch": int(current_epoch),
-            "validation_metrics": validation_metrics
-        }
-
-        self.models[mid] = cfg
-
-        print(f"Saving model at {os.path.join(self.folder, f'{mid}')}")
-        with open(os.path.join(self.folder, f"{mid}.json"), "w") as f:
-            json.dump(cfg, f, indent=2)
-
-        torch.save({
-            "model": mdl.state_dict(),
-            "optimizers": [o.state_dict() for o in optimizers],
-            "amp": amp.state_dict() if amp is not None else None
-        }, os.path.join(self.folder, f"{mid}.pth"))

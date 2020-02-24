@@ -1,7 +1,7 @@
 import torch
 from tqdm import tqdm
 import abc
-
+from torch.nn.parallel import DistributedDataParallel
 from .schedulers import WarmupScheduler, WarmupPlateauScheduler, WarmupStepScheduler
 
 try:
@@ -35,12 +35,13 @@ class AvgEstimator:
 
 
 class BaseTrainer(abc.ABC):
-    def __init__(self, cfg, model_parts, saver, logger, device):
+    def __init__(self, cfg, model_parts, saver, logger, device, rank=0):
         self.cfg = cfg
         self.batch_size = cfg.batch_size
         self.validation_batch_size = cfg.validation_batch_size
         self.epochs = cfg.epochs
         self.device = device
+        self.rank = rank
 
         self.optimizers = dict()
         self.schedulers = dict()
@@ -56,8 +57,9 @@ class BaseTrainer(abc.ABC):
             self.train_metrics = [self.train_metrics]
 
         # Add train metrics to logger
-        for metric in self.train_metrics:
-            self.logger.add_meter(metric)
+        if self.logger is not None:
+            for metric in self.train_metrics:
+                self.logger.add_meter(metric)
 
     def create_dataloaders(self):
         self.dataloader = self.get_dataloader(self.batch_size)
@@ -73,7 +75,8 @@ class BaseTrainer(abc.ABC):
         #     print("Scheduler cfg", cfg)
         #     return torch.optim.lr_scheduler.StepLR(optimizer, **cfg, last_epoch=-1)
         if name == "warmup_plateau":
-            cfg = self.standardize_kwargs(sched_cfg, lr=0.1, warmup_batches=500, gamma=0.5, plateau_size=100, plateau_eps=-1e-3,
+            cfg = self.standardize_kwargs(sched_cfg, lr=0.1, warmup_batches=500, gamma=0.5, plateau_size=100,
+                                          plateau_eps=-1e-3,
                                           patience=15)
             print("Scheduler cfg", cfg)
             return WarmupPlateauScheduler(optimizer, **cfg)
@@ -153,6 +156,9 @@ class BaseTrainer(abc.ABC):
     def get_train_metrics(self):
         return []
 
+    def pack_model(self):
+        return None
+
     def validate(self, epoch, train_batch, use_apex):
         if self.validation_dataloader is not None:
             print("Validating model")
@@ -173,9 +179,13 @@ class BaseTrainer(abc.ABC):
         else:
             estimators = dict()
 
-        self.saver.save(self.model_parts, self.optimizers, amp if use_apex else None, epoch, train_batch, estimators)
+        if self.saver is not None:
+            self.saver.save(self.model_parts, self.optimizers, amp if use_apex else None, epoch, train_batch,
+                            estimators)
 
-    def train(self, validate_every=-1, logger_min_wait=5):
+        # TODO barrier?
+
+    def train(self, validate_every=-1, logger_min_wait=5, distributed_data_parallel=False):
         # Define the set of batches IDs after which model is validated
         if validate_every == -1:
             validate_every = set()
@@ -184,13 +194,15 @@ class BaseTrainer(abc.ABC):
             validate_every = {i for i in range(validate_every, len(self.dataloader), validate_every)}.difference(
                 {len(self.dataloader) - 1})
 
-        self.logger.min_wait = logger_min_wait
+        if self.logger is not None:
+            self.logger.min_wait = logger_min_wait
 
         using_apex = self.cfg.get("apex", False) and HAS_APEX
         if using_apex:
             optimization_level = self.cfg.apex
-            print("")
-            print("=" * 20, "APEX", "=" * 20)
+            if self.rank == 0:
+                print("")
+                print("=" * 20, "APEX", "=" * 20)
 
             # Convert dicts to lists
             part_keys = sorted(list(self.model_parts.keys()))
@@ -198,15 +210,25 @@ class BaseTrainer(abc.ABC):
             parts = [self.model_parts[k] for k in part_keys]
             optimizers = [self.optimizers[k] for k in opt_keys]
 
-            parts, optimizers = amp.initialize(parts, optimizers, opt_level=optimization_level)
+            parts, optimizers = amp.initialize(parts, optimizers, opt_level=optimization_level,
+                                               verbosity=1 if self.rank == 0 else 0)
 
             # convert back to dicts
             self.model_parts = {k: x for k, x in zip(part_keys, parts)}
             self.optimizers = {k: x for k, x in zip(opt_keys, optimizers)}
 
-        print("\n")
-        print("=" * 20, "TRAINING", "=" * 20)
-        self.logger.start(self.dataloader)
+        if distributed_data_parallel:
+            self.model = self.pack_model()
+            if self.model is None:
+                raise Exception("When using distributed training you need to implement `pack_model`")
+            self.model = DistributedDataParallel(self.model, device_ids=[self.device], output_device=self.device)
+
+        if self.rank == 0:
+            print("\n")
+            print("=" * 20, "TRAINING", "=" * 20)
+
+        if self.logger is not None:
+            self.logger.start(self.dataloader)
         for epoch in range(self.epochs):
             for batch_idx, batch in enumerate(self.dataloader):
                 # zero grad
@@ -231,13 +253,18 @@ class BaseTrainer(abc.ABC):
                 for name in self.schedulers:
                     self.schedulers[name].step(loss.item())
 
-                self.logger.batch()
+                if self.logger is not None:
+                    self.logger.batch()
 
                 if batch_idx in validate_every:
                     self.validate(epoch, batch_idx, using_apex)
 
-            self.logger.epoch()
-            self.validate(epoch, len(self.dataloader), using_apex)
+            if self.logger is not None:
+                self.logger.epoch()
+
+            # TODO split validation across nodes
+            if self.rank == 0:
+                self.validate(epoch, len(self.dataloader), using_apex)
 
             # for name in self.schedulers:
             #     self.schedulers[name].step()
