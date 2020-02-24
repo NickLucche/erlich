@@ -7,7 +7,10 @@ import torch
 import torch.jit
 import torch.nn as nn
 from omegaconf import OmegaConf
+
 import torch.multiprocessing as mp
+import torch.distributed as dist
+
 
 from .saver import ModelSaver
 from .logging import TrainLogger
@@ -151,6 +154,13 @@ class Erlich:
         return model_parts, cfg
 
     def _train(self, rank, world_size, devices, trainer_class, cfg, mdl_id, mdl_path, validate_every, logger_min_wait):
+        # initialize the process group
+        dist.init_process_group("nccl", init_method='file:///code/sharedfile', rank=rank, world_size=world_size)
+
+        # Explicitly setting seed to make sure that models created in two processes
+        # start from same random weights and biases.
+        torch.manual_seed(42)
+
         device = devices[rank]
         print(f"Spawned trainer process {rank} that will use GPU device {device}")
 
