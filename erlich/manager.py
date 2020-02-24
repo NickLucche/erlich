@@ -161,7 +161,7 @@ class Erlich:
         # start from same random weights and biases.
         torch.manual_seed(42)
 
-        device = devices[rank]
+        device = torch.device("cuda", devices[rank])
         print(f"Spawned trainer process {rank} that will use GPU device {device}")
 
         if rank == 0:
