@@ -8,14 +8,16 @@ def moving_average(a, n=3):
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
+"""
 losses = []
 xs = []
-with open("55.log") as f:
+with open("79.log") as f:
     for line in f:
         obj = json.loads(line)
         loss = obj["Loss"] #float(line.split("    ")[2].strip().split(" ")[0])
         xs.append(obj["time"])
         losses.append(loss)
+
 
 #losses = np.log(np.array(losses))
 x = np.array(xs)
@@ -29,12 +31,12 @@ plt.show()
 """
 a = []
 b = []
-with open("0.log") as f:
+with open("79.log") as f:
     for line in f:
         obj = json.loads(line)
         loss = obj["Loss"]
         a.append(loss)
-with open("1.log") as f:
+with open("80.log") as f:
     for line in f:
         obj = json.loads(line)
         loss = obj["Loss"]
@@ -42,4 +44,4 @@ with open("1.log") as f:
 plt.plot(np.log(a))
 plt.plot(np.log(b))
 plt.show()
-"""
+
