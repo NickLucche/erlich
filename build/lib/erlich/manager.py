@@ -145,11 +145,11 @@ class Erlich:
 
         return checkpoint
 
-    def load_model(self, checkpoint_name, device):
+    def load_model(self, checkpoint_name, device, jit=False):
         model_id, _, checkpoint_path = self.get_checkpoint(checkpoint_name)
         cfg = self.read_model_config(model_id)
 
-        model_parts = self.instantiate_model_parts(cfg, device, jit=False)
+        model_parts = self.instantiate_model_parts(cfg, device, jit=jit)
         self.load_state_dicts(model_parts, checkpoint_path, device)
         return model_parts, cfg
 
