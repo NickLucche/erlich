@@ -188,7 +188,10 @@ class Erlich:
 
         # load checkpoint
         if "load_checkpoint" in cfg:
+            print("Loading checkpoint", str(cfg["load_checkpoint"]))
             _, _, checkpoint_path = self.get_checkpoint(str(cfg["load_checkpoint"]))
+            print("Checkpoint path", checkpoint_path)
+
             checkpoint = self.load_state_dicts(trainer.model_parts, checkpoint_path, device)
 
             if "load_optimizers" not in cfg or cfg["load_optimizers"]:
