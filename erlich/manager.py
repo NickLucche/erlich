@@ -157,6 +157,8 @@ class Erlich:
         # initialize the process group
         dist.init_process_group("nccl", init_method='file:///code/sharedfile', rank=rank, world_size=world_size)
 
+        print("HELLO")
+
         # Explicitly setting seed to make sure that models created in two processes
         # start from same random weights and biases.
         torch.manual_seed(42)
