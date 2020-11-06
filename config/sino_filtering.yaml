@@ -1,9 +1,0 @@
-parts:
-  sino_denoiser:
-    load: sino_denoiser.sino_denoiser@1000
-    frozen: true
-
-a: 1
-load:
-  - common
-
