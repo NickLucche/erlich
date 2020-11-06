@@ -29,7 +29,7 @@ def separable_conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activa
         return nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 1, bias=False),
             normalization(out_ch),
-            nn.Conv2d(out_ch, out_ch, size, stride=stride, padding=padding, bias=False, groups=normalization),
+            nn.Conv2d(out_ch, out_ch, size, stride=stride, padding=padding, bias=False, groups=out_ch),
             normalization(out_ch),
             get_activation(activation)
         )
