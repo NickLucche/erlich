@@ -9,5 +9,4 @@ setup(name='Erlich',
       author_email='TODO',
       url='TODO',
       packages=['erlich'],
-      scripts=['cli/erlich.py']
-     )
+)
