@@ -1,6 +1,8 @@
 import time
 import json
 
+import torch
+
 
 class Counter:
     def __init__(self, name, last_value):
@@ -27,7 +29,7 @@ class Counter:
 
 
 class AverageEstimator:
-    def __init__(self, name, fmt='{:.4e}'):
+    def __init__(self, name, fmt='{:.2e}'):
         self.name = name
         self.fmt = fmt
 
@@ -52,6 +54,9 @@ class AverageEstimator:
         self.epoch_count = 0.0
 
     def update(self, x):
+        if isinstance(x, torch.Tensor):
+            x = x.item()
+
         self.val += x
         self.count += 1
 
@@ -59,7 +64,7 @@ class AverageEstimator:
         self.epoch_count += 1
 
     def get_current_value(self):
-        return self.val / self.count
+        return self.val / max(self.count, 1)
 
     def to_str(self, curr_epoch, curr_batch):
         if self.count > 0:

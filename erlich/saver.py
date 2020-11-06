@@ -8,7 +8,8 @@ import torch
 
 class ModelSaver:
     def __init__(self, base_path):
-        os.mkdir(base_path)
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
         self.base_path = base_path
 
     @staticmethod
