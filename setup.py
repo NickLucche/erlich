@@ -8,5 +8,5 @@ setup(name='Erlich',
       author='Matteo Ronchetti',
       author_email='TODO',
       url='TODO',
-      packages=['erlich'],
+      packages=['erlich', "erlich.components"],
 )
