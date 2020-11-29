@@ -52,6 +52,25 @@ class DenseBlock(nn.Module):
         return x
 
 
+class DenseBlock(nn.Module):
+    def __init__(self, input_channels, growth_rate, n_layers, activation="relu", normalization=None):
+        super().__init__()
+
+        ch = input_channels
+        layers = []
+        for i in range(n_layers):
+            layers.append(conv(ch, growth_rate, 3, activation=activation, normalization=normalization))
+            ch += growth_rate
+
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = torch.cat((x, layer(x)), dim=1)
+
+        return x
+
+
 class DenseBottleneckBlock(nn.Module):
     def __init__(self, input_channels, growth_rate, n_layers, bottleneck=-1, threshold=-1, activation="relu", normalization=None):
         super().__init__()
@@ -67,7 +86,7 @@ class DenseBottleneckBlock(nn.Module):
             else:
                 layers.append(nn.Sequential(
                     conv(ch, bottleneck, 1, activation=activation, normalization=normalization),
-                    conv(bottleneck, growth_rate, 3, activation=activation, normalization=normalization)
+                    conv(bottleneck, ch, 3, activation=activation, normalization=normalization)
                 ))
 
             ch += growth_rate

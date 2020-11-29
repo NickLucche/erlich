@@ -17,7 +17,7 @@ class Upscale(nn.Module):
         return upscale(x, self.s)
 
 
-def separable_conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activation="relu", pad: Union[int, str] = "same"):
+def separable_conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activation="relu", pad: Union(int, str) = "same"):
     if pad == "same":
         padding = size // 2
     else:
@@ -42,7 +42,7 @@ def separable_conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activa
         )
 
 
-def conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activation="relu", pad: Union[int, str] = "same"):
+def conv(in_ch, out_ch=0, size=3, stride=1, normalization=None, activation="relu", pad: Union(int, str) = "same"):
     if pad == "same":
         padding = size // 2
     else:
