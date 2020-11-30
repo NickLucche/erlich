@@ -2,4 +2,7 @@
 .idea/
 
 models/
+
 build/
+dist/
+Erlich.egg-info/
