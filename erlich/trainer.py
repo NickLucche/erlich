@@ -5,13 +5,18 @@ from torch.nn.parallel import DistributedDataParallel
 from .schedulers import WarmupScheduler, WarmupPlateauScheduler, WarmupStepScheduler
 
 try:
-    from apex import amp
-
+    from torch.cuda import amp
+    print("[Erlich INFO] Imported mixed precision from torch (set 'mixed_precision: true' in config to use it)")
     HAS_APEX = True
 except ImportError:
-    print("[Erlich INFO] Apex not found")
-    amp = None
-    HAS_APEX = False
+    try:
+        from apex import amp
+        print("[Erlich INFO] Imported mixed precision from apex (set 'mixed_precision: true' in config to use it)")
+        HAS_APEX = True
+    except ImportError:
+        print("[Erlich INFO] AMP not found, mixed precision training not available")
+        amp = None
+        HAS_APEX = False
 
 
 def move_to_device(batch, device):
@@ -229,7 +234,7 @@ class BaseTrainer(abc.ABC):
         if self.logger is not None:
             self.logger.min_wait = logger_min_wait
 
-        using_apex = self.cfg.get("apex", False) and HAS_APEX
+        using_apex = self.cfg.get("mixed_precision", False) and HAS_APEX
         if using_apex:
             self.init_apex(num_losses)
 
