@@ -1,22 +1,10 @@
 import torch
+from torch.cuda import amp
+from torch.nn.parallel import DistributedDataParallel
 from tqdm import tqdm
 import abc
-from torch.nn.parallel import DistributedDataParallel
-from .schedulers import WarmupScheduler, WarmupPlateauScheduler, WarmupStepScheduler
 
-try:
-    from torch.cuda import amp
-    print("[Erlich INFO] Imported mixed precision from torch (set 'mixed_precision: true' in config to use it)")
-    HAS_APEX = True
-except ImportError:
-    try:
-        from apex import amp
-        print("[Erlich INFO] Imported mixed precision from apex (set 'mixed_precision: true' in config to use it)")
-        HAS_APEX = True
-    except ImportError:
-        print("[Erlich INFO] AMP not found, mixed precision training not available")
-        amp = None
-        HAS_APEX = False
+from .schedulers import WarmupScheduler, WarmupPlateauScheduler, WarmupStepScheduler
 
 
 def move_to_device(batch, device):
@@ -171,7 +159,7 @@ class BaseTrainer(abc.ABC):
     def pack_model(self):
         return None
 
-    def validate(self, epoch, train_batch, use_apex):
+    def validate(self, epoch, train_batch, using_mixed_precision):
         if self.validation_dataloader is not None:
             print("Validating model")
             self.before_validation(epoch, train_batch)
@@ -194,7 +182,7 @@ class BaseTrainer(abc.ABC):
             estimators = dict()
 
         if self.saver is not None:
-            self.saver.save(self.model_parts, self.optimizers, amp if use_apex else None, epoch, train_batch,
+            self.saver.save(self.model_parts, self.optimizers, epoch, train_batch,
                             estimators)
 
         # TODO barrier?
@@ -234,8 +222,8 @@ class BaseTrainer(abc.ABC):
         if self.logger is not None:
             self.logger.min_wait = logger_min_wait
 
-        using_apex = self.cfg.get("mixed_precision", False) and HAS_APEX
-        if using_apex:
+        using_mixed_precision = self.cfg.get("mixed_precision", False)
+        if using_mixed_precision:
             self.init_apex(num_losses)
 
         if distributed_data_parallel:
@@ -252,11 +240,13 @@ class BaseTrainer(abc.ABC):
         if self.logger is not None:
             self.logger.start(self.dataloader)
 
-        return validate_every, using_apex
+        return validate_every, using_mixed_precision
 
     def train(self, validate_every=-1, logger_min_wait=5, distributed_data_parallel=False):
         self.before_training()
-        validate_every, using_apex = self.init_training(validate_every, logger_min_wait, distributed_data_parallel, 1)
+        validate_every, using_mixed_precision = self.init_training(validate_every, logger_min_wait, distributed_data_parallel, 1)
+
+        scaler = torch.cuda.amp.GradScaler() if using_mixed_precision else None
 
         for epoch in range(self.epochs):
             self.before_train_epoch(epoch)
@@ -269,17 +259,18 @@ class BaseTrainer(abc.ABC):
                 batch = move_to_device(batch, self.device)
 
                 # do forward step
-                loss = self.train_step(batch, batch_idx, self.train_metrics)
+                with amp.autocast(enabled=using_mixed_precision):
+                    loss = self.train_step(batch, batch_idx, self.train_metrics)
 
-                if not isinstance(loss, float):
-                    if using_apex:
-                        with amp.scale_loss(loss, list(self.optimizers.values())) as scaled_loss:
-                            scaled_loss.backward()
+                if isinstance(loss, torch.Tensor):
+                    if using_mixed_precision:
+                        scaler.scale(loss).backward()
+                        for optim in self.optimizers.values():
+                            scaler.step(optim)
                     else:
                         loss.backward()
-
-                    for optim in self.optimizers.values():
-                        optim.step()
+                        for optim in self.optimizers.values():
+                            optim.step()
 
                     for name in self.schedulers:
                         self.schedulers[name].step(loss.item())
@@ -289,14 +280,14 @@ class BaseTrainer(abc.ABC):
 
                 # TODO split validation across nodes
                 if batch_idx in validate_every and self.rank == 0:
-                    self.validate(epoch, batch_idx, using_apex)
+                    self.validate(epoch, batch_idx, using_mixed_precision)
 
             if self.logger is not None:
                 self.logger.epoch()
 
             # TODO split validation across nodes
             if self.rank == 0:
-                self.validate(epoch, len(self.dataloader), using_apex)
+                self.validate(epoch, len(self.dataloader), using_mixed_precision)
 
     def before_training(self):
         pass

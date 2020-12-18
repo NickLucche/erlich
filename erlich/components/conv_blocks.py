@@ -6,12 +6,12 @@ from .convolutions import conv
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, normalization=None):
+    def __init__(self, in_channels, out_channels, stride=1, normalization=None, activation="relu"):
         super().__init__()
 
         self.layers = nn.Sequential(
-            conv(in_channels, out_channels, 3, stride=stride, normalization=normalization),
-            conv(out_channels, out_channels, 3, stride=1, normalization=normalization, activation=None)
+            conv(in_channels, out_channels, 3, stride=stride, normalization=normalization, activation=activation),
+            conv(out_channels, out_channels, 3, stride=1, normalization=normalization, activation=activation)
         )
 
         if stride != 1 or in_channels != out_channels:
@@ -26,11 +26,10 @@ class ResBlock(nn.Module):
         else:
             self.identity = Identity()
 
-        self.relu = nn.ReLU(inplace=True)
         self.stride = stride
 
     def forward(self, x):
-        return self.relu(self.layers(x)) + self.identity(x)
+        return self.layers(x) + self.identity(x)
 
 
 class DenseBlock(nn.Module):
