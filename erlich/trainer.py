@@ -196,24 +196,24 @@ class BaseTrainer(abc.ABC):
             return {i for i in range(validate_every, len(self.dataloader), validate_every)}.difference(
                 {len(self.dataloader) - 1})
 
-    def init_apex(self, num_losses=1):
-        optimization_level = self.cfg.apex
-        if self.rank == 0:
-            print("")
-            print("=" * 20, "APEX", "=" * 20)
+    # def init_apex(self, num_losses=1):
+    #     optimization_level = self.cfg.apex
+    #     if self.rank == 0:
+    #         print("")
+    #         print("=" * 20, "APEX", "=" * 20)
 
-        # Convert dicts to lists
-        part_keys = sorted(list(self.model_parts.keys()))
-        opt_keys = sorted(list(self.optimizers.keys()))
-        parts = [self.model_parts[k] for k in part_keys]
-        optimizers = [self.optimizers[k] for k in opt_keys]
+    #     # Convert dicts to lists
+    #     part_keys = sorted(list(self.model_parts.keys()))
+    #     opt_keys = sorted(list(self.optimizers.keys()))
+    #     parts = [self.model_parts[k] for k in part_keys]
+    #     optimizers = [self.optimizers[k] for k in opt_keys]
 
-        parts, optimizers = amp.initialize(parts, optimizers, opt_level=optimization_level,
-                                           verbosity=1 if self.rank == 0 else 0, num_losses=num_losses)
+    #     parts, optimizers = amp.initialize(parts, optimizers, opt_level=optimization_level,
+    #                                        verbosity=1 if self.rank == 0 else 0, num_losses=num_losses)
 
-        # convert back to dicts
-        self.model_parts = {k: x for k, x in zip(part_keys, parts)}
-        self.optimizers = {k: x for k, x in zip(opt_keys, optimizers)}
+    #     # convert back to dicts
+    #     self.model_parts = {k: x for k, x in zip(part_keys, parts)}
+    #     self.optimizers = {k: x for k, x in zip(opt_keys, optimizers)}
 
     def init_training(self, validate_every=-1, logger_min_wait=5, distributed_data_parallel=False, num_losses=1):
         # Define the set of batches IDs after which model is validated
@@ -223,8 +223,8 @@ class BaseTrainer(abc.ABC):
             self.logger.min_wait = logger_min_wait
 
         using_mixed_precision = self.cfg.get("mixed_precision", False)
-        if using_mixed_precision:
-            self.init_apex(num_losses)
+        # if using_mixed_precision:
+        #     self.init_apex(num_losses)
 
         if distributed_data_parallel:
             self.model = self.pack_model()
@@ -267,6 +267,7 @@ class BaseTrainer(abc.ABC):
                         scaler.scale(loss).backward()
                         for optim in self.optimizers.values():
                             scaler.step(optim)
+                        scaler.update()
                     else:
                         loss.backward()
                         for optim in self.optimizers.values():

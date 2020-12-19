@@ -266,7 +266,7 @@ class Erlich:
 
     def train(self, trainer_class, cfg, devices, validate_every=-1, logger_min_wait=5):
         print("=" * 20, "MODEL CONFIG", "=" * 20)
-        print(cfg.to_yaml())
+        print(OmegaConf.to_yaml(cfg))
 
         if not os.path.exists(self.model_folder):
             os.mkdir(self.model_folder)
